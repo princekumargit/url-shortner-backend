@@ -1,5 +1,6 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import cors from 'cors';
 
 import supabase from '../lib/supabase';
 import {authenticateToken} from '../lib/middlewares';
@@ -7,8 +8,31 @@ import {authenticateToken} from '../lib/middlewares';
 const app = express();
 const port = 8000;
 
+app.use(cors());
 app.use(express.json());
 
+app.post('/urls', authenticateToken, async (req: express.Request, res: express.Response) => {
+    try{
+        console.log("urls called");
+        const {userId} = req.body;
+        if(!userId){
+            res.status(400).json({message: "userId is Required"});
+        }
+
+        const id = uuidv4();
+        const { data, error } = await supabase
+            .from('urls')
+            .select('*')
+            .eq('userid', userId)
+        if (error) {
+            throw error;
+        }
+        res.status(200).json({message:"URL fetched successfully", data : data})
+    }catch(error){
+        console.log(error);
+        res.json(error);
+    }
+});
 
 app.post('/add', authenticateToken, async (req: express.Request, res: express.Response) => {
     try{
@@ -82,7 +106,7 @@ app.post('/signup', async (req: express.Request, res: express.Response) => {
         res.status(200).json({ message: "signup succesfull", data: signupResponse.data});
     }catch(error){
         console.log(error);
-        res.json(error);
+        res.status(400).json(error);
     }
     
 });
@@ -91,6 +115,7 @@ app.post('/signin', async (req: express.Request, res: express.Response) => {
     try{
         console.log("signin called");
         const {userEmail, password} = req.body;
+        console.log(userEmail, password);
 
         const signinresponse = await supabase.auth.signInWithPassword({ email: userEmail, password: password});
         if (signinresponse.error) throw signinresponse.error;
@@ -100,7 +125,7 @@ app.post('/signin', async (req: express.Request, res: express.Response) => {
         res.status(200).json({ message: "signin succesfull",data: signinresponse.data});
     }catch(error){
         console.log(error);
-        res.json(error);
+        res.status(400).json(error);
     }
     
 });
