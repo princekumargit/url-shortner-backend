@@ -15,19 +15,22 @@ app.post('/urls', authenticateToken, async (req: express.Request, res: express.R
     try{
         console.log("urls called");
         const {userId} = req.body;
+        // console.log(userId);
         if(!userId){
             res.status(400).json({message: "userId is Required"});
+            return;
         }
 
-        const id = uuidv4();
         const { data, error } = await supabase
             .from('urls')
             .select('*')
             .eq('userid', userId)
         if (error) {
-            throw error;
+            res.status(404).json({message: error});
+            return;
         }
-        res.status(200).json({message:"URL fetched successfully", data : data})
+        // console.log(data);
+        res.status(200).json({message: data})
     }catch(error){
         console.log(error);
         res.json(error);
@@ -40,18 +43,50 @@ app.post('/add', authenticateToken, async (req: express.Request, res: express.Re
         const {userId, url} = req.body;
         if(!userId){
             res.status(400).json({message: "userId is Required"});
+            return;
         }
         if(!url){
             res.status(400).json({message: "URL is Required"});
+            return;
         }
         const id = uuidv4();
         const { data, error } = await supabase
             .from('urls') 
             .insert({ id: id, userid: userId, createdat: new Date(),url: url });
         if (error) {
-            throw error;
+            res.status(503).json({message: error});
+            return;
         }
         res.status(200).json({message:"URL added successfully", data : {id:id, url: url, userId: userId}})
+    }catch(error){
+        console.log(error);
+        res.json(error);
+    }
+});
+app.post('/delete', authenticateToken, async (req: express.Request, res: express.Response) => {
+    try{
+        console.log("delete called");
+        const {userId, urlId} = req.body;
+        console.log(userId, urlId)
+        if(!userId){
+            res.status(400).json({message: "userId is Required"});
+            return;
+        }
+        if(!urlId){
+            res.status(400).json({message: "URL ID is Required"});
+            return;
+        }
+        const selectRes = await supabase
+            .from('urls')
+            .delete()
+            .eq("id",urlId)
+            .eq("userid",userId)
+
+        if (selectRes.error) {
+            res.status(503).json({message: selectRes.error});
+            return;
+        }
+        res.status(200).json({message: selectRes})
     }catch(error){
         console.log(error);
         res.json(error);
@@ -68,14 +103,17 @@ app.get('/geturl/:urlId', async (req: express.Request, res: express.Response) =>
             .single();
 
         if (error) {
-            throw error;
+            res.status(503).json({message: error});
+            return;
         }
 
         if (!data) {
-            return res.status(404).json({ error: 'URL not found' });
+            // console.log(data.url)
+            res.status(404).json({ error: 'URL not found' });
+            return;
         }
 
-        res.json({ url: data.url });
+        res.status(200).json({ url: data.url});
     } catch (error) {
         console.log(error);
         res.json(error);
@@ -86,27 +124,41 @@ app.post('/signup', async (req: express.Request, res: express.Response) => {
     try{
         console.log("signup called");
         const {userName , userEmail, password} = req.body;
-
-        const checkUser = await supabase.from('userstable').select('*').eq('useremail', userEmail);
-        if(checkUser){
-            res.status(400).json({message: "Email already exists"});
+        if(!userName || !userEmail || !password){
+            res.status(422).json({message: "Incomplete Credentials"});
+            return;
         }
 
+        const checkUser = await supabase.from('userstable').select('*').eq('useremail', userEmail);
+        if(checkUser.error){
+            // console.log("supabase error");
+            throw checkUser.error;
+        }
+        if(checkUser.data.length > 0){
+            // console.log(checkUser);
+            res.status(409).json({message: "Email already exists"});
+            return;
+        }
+        // console.log("this is running");
+
         const signupResponse = await supabase.auth.signUp({email: userEmail, password: password});
-        if (signupResponse.error) throw signupResponse.error;
+        // console.log(signupResponse.data)
+        if (signupResponse.error){
+            res.status(503).json({message: signupResponse.error});
+            return;
+        }
         const user = signupResponse.data.user;
 
-        
-        if (user) {
+        if (user != null) {
             const insertResponse = await supabase
             .from('userstable')
             .insert([{ id:  user.id, username: userName, useremail: userEmail, verified: false}]);
         }
+        res.status(200).json({ message: signupResponse.data});
         
-        res.status(200).json({ message: "signup succesfull", data: signupResponse.data});
     }catch(error){
         console.log(error);
-        res.status(400).json(error);
+        res.status(500).json(error);
     }
     
 });
@@ -115,17 +167,24 @@ app.post('/signin', async (req: express.Request, res: express.Response) => {
     try{
         console.log("signin called");
         const {userEmail, password} = req.body;
-        console.log(userEmail, password);
+        // console.log(userEmail, password);
+        if( !userEmail || !password){
+            res.status(422).json({message: "Incomplete Credentials"});
+            return;
+        }
 
         const signinresponse = await supabase.auth.signInWithPassword({ email: userEmail, password: password});
-        if (signinresponse.error) throw signinresponse.error;
+        if (signinresponse.error){
+            res.status(400).json({message: signinresponse.error})
+            return;
+        }
 
         const user = signinresponse.data.user;
         
-        res.status(200).json({ message: "signin succesfull",data: signinresponse.data});
+        res.status(200).json({ message: signinresponse.data});
     }catch(error){
         console.log(error);
-        res.status(400).json(error);
+        res.status(500).json(error);
     }
     
 });
