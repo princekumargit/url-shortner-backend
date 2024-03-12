@@ -120,6 +120,33 @@ app.get('/geturl/:urlId', async (req: express.Request, res: express.Response) =>
     }
 });
 
+app.get('/:urlId', async (req: express.Request, res: express.Response) =>{
+    try {
+        const urlId = req.params.urlId;
+        const { data, error } = await supabase
+            .from('urls')
+            .select('url')
+            .eq('id', urlId)
+            .single();
+
+        if (error) {
+            res.status(503).json({message: error});
+            return;
+        }
+
+        if (!data) {
+            // console.log(data.url)
+            res.status(404).json({ error: 'URL not found' });
+            return;
+        }
+        const URL = "http://"+data.url;
+        res.redirect(URL);
+    } catch (error) {
+        console.log(error);
+        res.json(error);
+    }
+});
+
 app.post('/signup', async (req: express.Request, res: express.Response) => {
     try{
         console.log("signup called");
