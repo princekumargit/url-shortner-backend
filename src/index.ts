@@ -139,7 +139,7 @@ app.get('/:urlId', async (req: express.Request, res: express.Response) =>{
             res.status(404).json({ error: 'URL not found' });
             return;
         }
-        const URL = "http://"+data.url;
+        const URL = data.url;
         res.redirect(URL);
     } catch (error) {
         console.log(error);
